@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "users": {
+      "path": "users/{userId}",
+      "description": "User profile information",
+      "fields": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "description": "User email" },
+        "displayName": { "type": "string", "description": "Display name" },
+        "createdAt": { "type": "string", "description": "Timestamp" }
+      }
+    },
+    "pitchSessions": {
+      "path": "users/{userId}/pitchSessions/{sessionId}",
+      "description": "Pitch practice and evaluation sessions per user",
+      "fields": {
+        "id": { "type": "string", "description": "Session ID" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "title": { "type": "string", "description": "Pitch title or excerpt" },
+        "pitch": { "type": "string", "description": "Initial pitch content" },
+        "mode": { "type": "string", "description": "decision or practice" },
+        "decision": { "type": "string", "description": "ACCEPT, REJECT, UNDECIDED, PRACTICE" },
+        "latestScores": { "type": "object", "description": "Latest scorecard" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Update timestamp" }
+      }
+    },
+    "messages": {
+      "path": "users/{userId}/pitchSessions/{sessionId}/messages/{messageId}",
+      "description": "Chat log history between founder and the 3 judges",
+      "fields": {
+        "id": { "type": "string", "description": "Message ID" },
+        "role": { "type": "string", "description": "user or judges" },
+        "content": { "type": "string", "description": "Message content or critique" },
+        "evaluation": { "type": "object", "description": "Detailed judge scorecard and verdict" },
+        "timestamp": { "type": "string", "description": "ISO timestamp" }
+      }
+    }
+  }
+}
