@@ -32,18 +32,18 @@ interface TestCase {
 const TEST_CASES: TestCase[] = [
   {
     id: 'TC-01',
-    category: 'Authentication & Isolation',
-    name: 'Firebase Auth & User Data Isolation',
-    objective: 'Ensure pitch sessions are strictly scoped to the authenticated user UID.',
-    preconditions: 'User visits the applet and clicks Google Sign-In or Guest Demo.',
+    category: 'Authentication & Quota Protection',
+    name: 'Google Auth Enforcement & Guest Quota Protection (Strategy 3)',
+    objective: 'Ensure live LLM calls require verified Google authentication, while guests explore precomputed sample deliberations.',
+    preconditions: 'User visits the applet as Guest or authenticated Google user.',
     steps: [
-      '1. Trigger sign-in via Google popup or Guest Auth.',
-      '2. Verify user token is passed in Authorization header.',
-      '3. Verify session document is stored at users/{uid}/pitchSessions/{sessionId}.',
-      '4. Verify Firestore security rules deny access to any other user UID.',
+      '1. As a Guest: click any Interactive Sample Pitch (CyberGuard, FleetPulse, NomadBeds) — verified zero LLM calls.',
+      '2. As a Guest: attempt to evaluate a custom pitch — verified RequireAuthModal prompts for Google Sign-In.',
+      '3. In backend: verify /api/evaluate-pitch returns 403 for guest tokens.',
+      '4. Sign in with Google: verify custom pitches execute live Gemini deliberation and save to Firestore.',
     ],
-    expectedResult: 'Pitch data persists exclusively inside the owner user UID path.',
-    securityZone: 'Memory & State / Broken Access Control (OWASP A01)',
+    expectedResult: 'Guest exploration is fully functional without consuming LLM quota; custom pitches are protected behind Google Auth.',
+    securityZone: 'API Abuse Prevention & Broken Access Control (OWASP A01 / LLM04)',
   },
   {
     id: 'TC-02',

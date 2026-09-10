@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { getApps, initializeApp } from 'firebase-admin/app';
@@ -17,11 +18,9 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 // Initialize Firebase Admin lazily/gracefully
 let firebaseAdminInitialized = false;
 try {
-  const projectId = process.env.GCP_PROJECT_ID || 'YOUR_GCP_PROJECT_ID';
+  const projectId = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
   if (!getApps().length) {
-    initializeApp({
-      projectId,
-    });
+    initializeApp(projectId ? { projectId } : undefined);
     firebaseAdminInitialized = true;
   }
 } catch (err) {
@@ -47,14 +46,15 @@ async function getGeminiApiKey(): Promise<string> {
   try {
     const { SecretManagerServiceClient } = await import('@google-cloud/secret-manager');
     const client = new SecretManagerServiceClient();
-    const projectId = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'YOUR_GCP_PROJECT_ID';
-    const secretName = `projects/${projectId}/secrets/GEMINI_API_KEY/versions/latest`;
-
-    const [version] = await client.accessSecretVersion({ name: secretName });
-    const payload = version.payload?.data?.toString();
-    if (payload && payload.trim().length > 0) {
-      cachedGeminiKey = payload.trim();
-      return cachedGeminiKey;
+    const projectId = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+    if (projectId) {
+      const secretName = `projects/${projectId}/secrets/GEMINI_API_KEY/versions/latest`;
+      const [version] = await client.accessSecretVersion({ name: secretName });
+      const payload = version.payload?.data?.toString();
+      if (payload && payload.trim().length > 0) {
+        cachedGeminiKey = payload.trim();
+        return cachedGeminiKey;
+      }
     }
   } catch (err) {
     // Graceful fallback: log warning without leaking secrets
@@ -145,6 +145,15 @@ interface EvaluatePayload {
 // 2. Defensive Payload Ingestion & API Handler
 app.post('/api/evaluate-pitch', verifyFirebaseToken, async (req: Request, res: Response) => {
   try {
+    // Strategy 3: Require Verified Google Authentication for live LLM evaluations
+    if ((req as any).user?.isGuest) {
+      return res.status(403).json({
+        success: false,
+        requiresAuth: true,
+        error: 'Sign in with Google to evaluate custom pitches with live Gemini AI. Guest mode is restricted to interactive sample pitches.',
+      });
+    }
+
     const body: EvaluatePayload = req.body && typeof req.body === 'object' ? req.body : {};
     const pitch = (body.pitch || '').trim().slice(0, 4000);
     const mode = body.mode === 'practice' ? 'practice' : 'decision';
@@ -326,6 +335,12 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', service: 'board-pitcher', timestamp: new Date().toISOString() });
 });
 
+// Optional client Firebase config endpoint
+app.get('/api/firebase-config', (req: Request, res: Response) => {
+  const dynamicKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+  res.json({ apiKey: dynamicKey || null });
+});
+
 // 3. Vite middleware for development & Static hosting for production
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
@@ -339,7 +354,14 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req: Request, res: Response) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      const dynamicKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+      if (dynamicKey && fs.existsSync(indexPath)) {
+        let html = fs.readFileSync(indexPath, 'utf-8');
+        html = html.replace('</head>', `<script>window.__FIREBASE_API_KEY__=${JSON.stringify(dynamicKey)};</script></head>`);
+        return res.send(html);
+      }
+      res.sendFile(indexPath);
     });
   }
 

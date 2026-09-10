@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { JudgeMode, PitchSession, AppUser } from '../types';
+import { SAMPLE_PITCHES, SamplePitchData } from '../data/samplePitches';
 
 interface PitchSidebarProps {
   user: User | AppUser | null;
@@ -25,6 +26,7 @@ interface PitchSidebarProps {
   sessions: PitchSession[];
   currentSessionId: string | null;
   onSelectSession: (id: string) => void;
+  onSelectSamplePitch: (sample: SamplePitchData) => void;
   onNewSession: () => void;
   onDeleteSession: (id: string, e: React.MouseEvent) => void;
   onSignInWithGoogle: () => void;
@@ -59,6 +61,7 @@ export const PitchSidebar: React.FC<PitchSidebarProps> = ({
   sessions,
   currentSessionId,
   onSelectSession,
+  onSelectSamplePitch,
   onNewSession,
   onDeleteSession,
   onSignInWithGoogle,
@@ -68,6 +71,8 @@ export const PitchSidebar: React.FC<PitchSidebarProps> = ({
   onStartEvaluation,
   onOpenWalkthrough,
 }) => {
+  const isGuest = !user || (user as any).isAnonymous || !(user as any).email;
+
   return (
     <aside
       id="pitch-sidebar-panel"
@@ -100,15 +105,83 @@ export const PitchSidebar: React.FC<PitchSidebarProps> = ({
             <ShieldCheck className="w-4 h-4 text-indigo-600" />
           </button>
         </div>
+
+        {/* Guest Mode Banner */}
+        {isGuest && (
+          <div className="mt-3 p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wide flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-indigo-600" /> Guest Exploration
+              </span>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-white text-indigo-700 font-semibold border border-indigo-200">
+                Demo Mode
+              </span>
+            </div>
+            <p className="text-[11px] text-indigo-950/80 leading-snug">
+              Explore interactive sample pitches below. Sign in with Google to evaluate your custom pitch with live Gemini AI.
+            </p>
+            <button
+              type="button"
+              id="sidebar-guest-signin-btn"
+              onClick={onSignInWithGoogle}
+              className="mt-2 w-full py-1.5 px-2.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+            >
+              <LogIn className="w-3.5 h-3.5" /> Sign In with Google
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Controls & Pitch Context */}
       <div className="flex-1 p-5 space-y-5 overflow-y-auto">
+        {/* Interactive Sample Pitches (Instant Demos) */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Sample Pitches (Instant Demos)
+            </label>
+            <span className="text-[10px] text-emerald-600 font-medium">
+              Zero Quota
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {SAMPLE_PITCHES.map((sample) => (
+              <button
+                key={sample.id}
+                type="button"
+                id={`sample-pitch-${sample.id}`}
+                onClick={() => onSelectSamplePitch(sample)}
+                className="w-full text-left p-2.5 rounded-lg border border-gray-100 bg-gray-50/80 hover:bg-indigo-50/60 hover:border-indigo-200 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-gray-800 group-hover:text-indigo-600">
+                    {sample.title}
+                  </span>
+                  <span
+                    className={`text-[9px] px-1.5 py-0.5 font-bold rounded uppercase ${
+                      sample.decision === 'ACCEPT'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : sample.decision === 'REJECT'
+                        ? 'bg-rose-100 text-rose-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {sample.decision}
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-500 line-clamp-1">
+                  {sample.pitch}
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+
         {/* Pitch Input Section */}
         <section>
           <div className="flex items-center justify-between mb-2">
             <label htmlFor="founder-pitch-input" className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-              Current Pitch
+              Custom Pitch
             </label>
             <span className="text-[10px] text-gray-400 font-mono">
               {pitch.length}/4000
@@ -120,29 +193,9 @@ export const PitchSidebar: React.FC<PitchSidebarProps> = ({
             value={pitch}
             onChange={(e) => setPitch(e.target.value.slice(0, 4000))}
             placeholder="Describe your startup, core value prop, market, traction, and ask..."
-            rows={5}
+            rows={4}
             className="w-full p-3 text-sm bg-gray-50 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white text-gray-800 transition-colors leading-relaxed"
           />
-
-          {/* Quick Pitch Templates */}
-          <div className="mt-2">
-            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-              Sample Templates:
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {PITCH_TEMPLATES.map((tpl, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  id={`template-btn-${i}`}
-                  onClick={() => setPitch(tpl.pitch)}
-                  className="text-[10px] px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition-colors cursor-pointer"
-                >
-                  {tpl.title.split(' ')[0]}
-                </button>
-              ))}
-            </div>
-          </div>
         </section>
 
         {/* Mode Toggle: Decision vs Practice */}

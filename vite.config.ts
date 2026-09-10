@@ -6,6 +6,11 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    define: {
+      'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(
+        process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || ''
+      ),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

@@ -11,8 +11,12 @@ import {
 import { getFirestore, Firestore } from 'firebase/firestore';
 import firebaseConfigJson from '../firebase-applet-config.json';
 
+// Resolve API key dynamically from GCP Cloud Run environment injection, Vite build env, or json fallback
+const dynamicApiKey = typeof window !== 'undefined' ? (window as any).__FIREBASE_API_KEY__ : undefined;
+const resolvedApiKey = dynamicApiKey || (import.meta as any).env?.VITE_FIREBASE_API_KEY || firebaseConfigJson.apiKey;
+
 const firebaseConfig = {
-  apiKey: firebaseConfigJson.apiKey,
+  apiKey: resolvedApiKey,
   authDomain: firebaseConfigJson.authDomain,
   projectId: firebaseConfigJson.projectId,
   storageBucket: firebaseConfigJson.storageBucket,

@@ -29,6 +29,8 @@ import { JudgeCards } from './components/JudgeCards';
 import { Scoreboard } from './components/Scoreboard';
 import { ChatHistory } from './components/ChatHistory';
 import { WalkthroughModal } from './components/WalkthroughModal';
+import { RequireAuthModal } from './components/RequireAuthModal';
+import { SAMPLE_PITCHES, SamplePitchData } from './data/samplePitches';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function App() {
@@ -43,12 +45,27 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
   const [isWalkthroughOpen, setIsWalkthroughOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authActionAttempted, setAuthActionAttempted] = useState<string>('evaluate custom startup pitches');
+
+  // Check if current user is a guest (unauthenticated or local guest)
+  const isGuest = !user || (user as any).isAnonymous || !(user as any).email;
 
   // Derive latest evaluation from the most recent judge message
   const latestEvaluation: JudgeEvaluation | null =
     [...messages]
       .reverse()
       .find((m) => m.role === 'judges' && m.evaluation)?.evaluation || null;
+
+  // Initial preload of demo pitch so guests see an instant active board deliberation
+  useEffect(() => {
+    if (messages.length === 0 && !currentSessionId) {
+      const defaultSample = SAMPLE_PITCHES[0];
+      setPitch(defaultSample.pitch);
+      setMessages([defaultSample.initialMessage, defaultSample.judgeResponse]);
+      setCurrentSessionId(defaultSample.id);
+    }
+  }, []);
 
   // Listen to Auth State
   useEffect(() => {
@@ -174,9 +191,27 @@ export default function App() {
     }
   };
 
+  // Select Interactive Sample Pitch (Zero AI Quota)
+  const handleSelectSamplePitch = (sample: SamplePitchData) => {
+    setCurrentSessionId(sample.id);
+    setPitch(sample.pitch);
+    setMode('decision');
+    setMessages([sample.initialMessage, sample.judgeResponse]);
+    setErrorMessage(null);
+    showToast(`Loaded interactive demo: ${sample.title} (${sample.decision})`);
+  };
+
   // Evaluate Pitch (First turn or revised pitch)
   const handleStartEvaluation = async () => {
     if (!pitch.trim() || isEvaluating) return;
+
+    // Strategy 3: Require Google Sign-In for custom pitches
+    if (isGuest) {
+      setAuthActionAttempted('evaluate your custom startup pitch with live Gemini AI');
+      setIsAuthModalOpen(true);
+      return;
+    }
+
     setErrorMessage(null);
     setIsEvaluating(true);
 
@@ -260,6 +295,13 @@ export default function App() {
     const textToSend = (customText || inputText).trim();
     if (!textToSend && !requestDecision) return;
     if (isEvaluating) return;
+
+    // Strategy 3: Require Google Sign-In for custom messages & follow-ups
+    if (isGuest) {
+      setAuthActionAttempted('send follow-up responses and defend your pitch to the board');
+      setIsAuthModalOpen(true);
+      return;
+    }
 
     setErrorMessage(null);
     setIsEvaluating(true);
@@ -352,6 +394,11 @@ export default function App() {
 
   // Call for Final Investment Vote Shortcut
   const handleCallForVote = () => {
+    if (isGuest) {
+      setAuthActionAttempted('call for a final investment vote from the board');
+      setIsAuthModalOpen(true);
+      return;
+    }
     handleSendMessage('We have addressed the critical points. I would now like to call for a final investment decision from the board.', true);
   };
 
@@ -413,6 +460,7 @@ export default function App() {
         sessions={sessions}
         currentSessionId={currentSessionId}
         onSelectSession={handleSelectSession}
+        onSelectSamplePitch={handleSelectSamplePitch}
         onNewSession={handleNewSession}
         onDeleteSession={handleDeleteSession}
         onSignInWithGoogle={handleGoogleSignIn}
@@ -452,6 +500,14 @@ export default function App() {
         isOpen={isWalkthroughOpen}
         onClose={() => setIsWalkthroughOpen(false)}
         onRunScenario={handleRunScenario}
+      />
+
+      {/* Strategy 3: Require Auth Modal */}
+      <RequireAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSignInWithGoogle={handleGoogleSignIn}
+        actionAttempted={authActionAttempted}
       />
     </div>
   );
